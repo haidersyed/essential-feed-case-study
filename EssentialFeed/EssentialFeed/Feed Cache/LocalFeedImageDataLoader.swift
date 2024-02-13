@@ -4,43 +4,48 @@
 
 import Foundation
 
-public final class LocalFeedImageDataLoader {
+public final class LocalFeedImageDataLoader: FeedImageDataLoader {
 	private let store: FeedImageDataStore
-	
 	public init(store: FeedImageDataStore) {
 		self.store = store
 	}
-}
 
-extension LocalFeedImageDataLoader: FeedImageDataCache {
-	public enum SaveError: Error {
-		case failed
-	}
-	
-	public func save(_ data: Data, for url: URL) throws {
-		do {
-			try store.insert(data, for: url)
-		} catch {
-			throw SaveError.failed
-		}
-	}
-}
-
-extension LocalFeedImageDataLoader: FeedImageDataLoader {
-	public enum LoadError: Error {
+	public enum Error: Swift.Error {
 		case failed
 		case notFound
 	}
-		
-	public func loadImageData(from url: URL) throws -> Data {
-		do {
-			if let imageData = try store.retrieve(dataForURL: url) {
-				return imageData
-			}
-		} catch {
-			throw LoadError.failed
+
+	private final class Task: FeedImageDataLoaderTask {
+		private var completion: ((FeedImageDataLoader.Result) -> Void)?
+
+		init(_ completion: @escaping (FeedImageDataLoader.Result) -> Void) {
+			self.completion = completion
 		}
-		
-		throw LoadError.notFound
+
+		func complete(with result: FeedImageDataLoader.Result) {
+			completion?(result)
+		}
+
+		func cancel() {
+			preventFurtherCompletions()
+		}
+
+		private func preventFurtherCompletions() {
+			completion = nil
+		}
+	}
+
+	public func loadImageData(from url: URL, completion: @escaping (FeedImageDataLoader.Result) -> Void) -> FeedImageDataLoaderTask {
+		let task = Task(completion)
+		store.retrieve(dataForURL: url) { [weak self] result in
+			guard self != nil else { return }
+
+			task.complete(with: result
+				.mapError { _ in Error.failed }
+				.flatMap { data in
+					data.map { .success($0) } ?? .failure(Error.notFound)
+				})
+		}
+		return task
 	}
 }
