@@ -98,7 +98,7 @@ class LoadFeedFromRemoteUseCaseTests: XCTestCase {
 		let client = HTTPClientSpy()
 		var sut: RemoteFeedLoader? = RemoteFeedLoader(url: url, client: client)
 		
-		var capturedResults = [RemoteFeedLoader.Result]()
+		var capturedResults = [RemoteFeedLoader.Result]
 		sut?.load { capturedResults.append($0) }
 
 		sut = nil
