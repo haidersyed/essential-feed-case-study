@@ -6,16 +6,19 @@ import XCTest
 import EssentialFeed
 
 protocol FeedImageDataStore {
-	func retrieve(dataForURL url: URL)
+	typealias Result = Swift.Result<Data?, Error>
+
+	func retrieve(dataForURL url: URL, completion: @escaping (Result) -> Void)
 }
 
-final class LocalFeedImageDataLoader : FeedImageDataStore {
-	func retrieve(dataForURL url: URL) {
-		
-	}
+final class LocalFeedImageDataLoader : FeedImageDataLoader {
 	
 	private struct Task: FeedImageDataLoaderTask {
 		func cancel() {}
+	}
+	
+	public enum Error: Swift.Error {
+		case failed
 	}
 
 	private let store: FeedImageDataStore
@@ -25,7 +28,9 @@ final class LocalFeedImageDataLoader : FeedImageDataStore {
 	}
 
 	func loadImageData(from url: URL, completion: @escaping (FeedImageDataLoader.Result) -> Void) -> FeedImageDataLoaderTask {
-		store.retrieve(dataForURL: url)
+		store.retrieve(dataForURL: url) { result in
+			completion(.failure(Error.failed))
+		}
 		return Task()
 	}
 }
@@ -52,11 +57,13 @@ class LocalFeedImageDataLoaderTests: XCTestCase {
 		enum Message: Equatable {
 			case retrieve(dataFor: URL)
 		}
-
+		
+		private var completions = [(FeedImageDataStore.Result) -> Void]()
 		private(set) var receivedMessages = [Message]()
 
-		func retrieve(dataForURL url: URL) {
+		func retrieve(dataForURL url: URL, completion: @escaping (FeedImageDataStore.Result) -> Void) {
 			receivedMessages.append(.retrieve(dataFor: url))
+			completions.append(completion)
 		}
 	}
 
